@@ -20,6 +20,7 @@ import pytest
 
 from google.auth import _credentials_async as credentials
 from google.auth import _default_async as _default
+from google.auth import api_key
 from google.auth import app_engine
 from google.auth import compute_engine
 from google.auth import environment_vars
@@ -509,7 +510,9 @@ def test_default_fail(unused_gce, unused_gae, unused_sdk, unused_explicit):
 def test_default_scoped(with_scopes, unused_get):
     scopes = ["one", "two"]
 
-    credentials, project_id = _default.default_async(scopes=scopes)
+    credentials, project_id = _default.default_async(
+        scopes=scopes, quota_project_id="project-foo"
+    )
 
     assert credentials == with_scopes.return_value
     assert project_id == mock.sentinel.project_id
@@ -533,3 +536,28 @@ def test_default_no_app_engine_compute_engine_module(unused_get):
         sys.modules["google.auth.compute_engine"] = None
         sys.modules["google.auth.app_engine"] = None
         assert _default.default_async() == (MOCK_CREDENTIALS, mock.sentinel.project_id)
+
+
+@mock.patch(
+    "google.auth._default_async._get_explicit_environ_credentials",
+    return_value=(MOCK_CREDENTIALS, mock.sentinel.project_id),
+    autospec=True,
+)
+def test_default_api_key(unused_get):
+    cred, project_id = _default.default_async(api_key="api-key")
+    assert isinstance(cred, api_key.Credentials)
+    assert cred.token == "api-key"
+    assert project_id is None
+
+
+@mock.patch(
+    "google.auth._default_async._get_explicit_environ_credentials",
+    return_value=(MOCK_CREDENTIALS, mock.sentinel.project_id),
+    autospec=True,
+)
+def test_default_api_key_from_env_var(unused_get):
+    with mock.patch.dict(os.environ, {environment_vars.API_KEY: "api-key"}):
+        cred, project_id = _default.default_async()
+        assert isinstance(cred, api_key.Credentials)
+        assert cred.token == "api-key"
+        assert project_id is None

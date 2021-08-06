@@ -816,7 +816,7 @@ def test_default_api_key(unused_get):
 )
 def test_default_api_key_from_env_var(unused_get):
     with mock.patch.dict(os.environ, {environment_vars.API_KEY: "api-key"}):
-        cred, project_id = _default._get_api_key_credentials()
+        cred, project_id = _default.default()
         assert isinstance(cred, api_key.Credentials)
         assert cred.token == "api-key"
         assert project_id is None

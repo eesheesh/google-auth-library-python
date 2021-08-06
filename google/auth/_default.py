@@ -368,8 +368,8 @@ def default(
     order:
 
     1. If `api_key` is provided or the environment variable ``GOOGLE_API_KEY`` is
-       set, an API key credentials will be returned. The provided `api_key` takes
-       precedence over the environment variable.
+       set, an `API Key`_ credentials will be returned. The provided `api_key`
+       takes precedence over the environment variable.
        The project ID returned is the one defined by ``GOOGLE_CLOUD_PROJECT`` or
        ``GCLOUD_PROJECT`` environment variables.
     2. If the environment variable ``GOOGLE_APPLICATION_CREDENTIALS`` is set
@@ -420,6 +420,7 @@ def default(
     .. _Metadata Service: https://cloud.google.com/compute/docs\
             /storing-retrieving-metadata
     .. _Cloud Run: https://cloud.google.com/run
+    .. _API Key: https://cloud.google.com/docs/authentication/api-keys
 
     Example::
 
@@ -456,6 +457,7 @@ def default(
             invalid.
     """
     from google.auth.credentials import with_scopes_if_required
+    from google.auth.credentials import CredentialsWithQuotaProject
 
     explicit_project_id = os.environ.get(
         environment_vars.PROJECT, os.environ.get(environment_vars.LEGACY_PROJECT)
@@ -490,7 +492,9 @@ def default(
                     request = google.auth.transport.requests.Request()
                 project_id = credentials.get_project_id(request=request)
 
-            if quota_project_id:
+            if quota_project_id and isinstance(
+                credentials, CredentialsWithQuotaProject
+            ):
                 credentials = credentials.with_quota_project(quota_project_id)
 
             effective_project_id = explicit_project_id or project_id
