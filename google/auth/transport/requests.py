@@ -254,22 +254,25 @@ class _HsmTlsAdapter(requests.adapters.HTTPAdapter):
         from OpenSSL import crypto
         import urllib3.contrib.pyopenssl
         from OpenSSL._util import lib as _lib
+        from OpenSSL._util import exception_from_error_queue
 
         urllib3.contrib.pyopenssl.inject_into_urllib3()
 
-        pkey = google.auth.transport.mtls.load_private_pkcs11_key(key)
+        pkey = google.auth.transport.mtls._load_pkcs11_private_key(key)
         x509 = crypto.load_certificate(crypto.FILETYPE_PEM, cert)
 
         ctx_poolmanager = create_urllib3_context()
         ctx_poolmanager.load_verify_locations(cafile=certifi.where())
         ctx_poolmanager._ctx.use_certificate(x509)
-        _lib.SSL_CTX_use_PrivateKey(ctx_poolmanager._ctx._context, pkey)
+        if not _lib.SSL_CTX_use_PrivateKey(ctx_poolmanager._ctx._context, pkey):
+            raise exception_from_error_queue(exceptions.MutualTLSChannelError)
         self._ctx_poolmanager = ctx_poolmanager
 
         ctx_proxymanager = create_urllib3_context()
         ctx_proxymanager.load_verify_locations(cafile=certifi.where())
         ctx_proxymanager._ctx.use_certificate(x509)
-        _lib.SSL_CTX_use_PrivateKey(ctx_proxymanager._ctx._context, pkey)
+        if not _lib.SSL_CTX_use_PrivateKey(ctx_proxymanager._ctx._context, pkey):
+            raise exception_from_error_queue(exceptions.MutualTLSChannelError)
         self._ctx_proxymanager = ctx_proxymanager
 
         super(_HsmTlsAdapter, self).__init__()

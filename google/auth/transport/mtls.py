@@ -105,7 +105,15 @@ def default_client_encrypted_cert_source(cert_path, key_path):
     return callback
 
 
-def load_private_pkcs11_key(key):
+def _load_pkcs11_private_key(key_url):
+    """Get the key object from HSM with the given key_url.
+
+    Args:
+        key_url (bytes): key_url must have b"engine:<engine_id>:<key_id>" format.
+            For instance, if engine id is "pkcs11", and key id is
+            "pkcs11:token=token1;object=label1;pin-value=mypin", then the key_url
+            is b"engine:pkcs11:pkcs11:token=token1;object=label1;pin-value=mypin". 
+    """
     from OpenSSL._util import (
         ffi as _ffi,
         lib as _lib,
@@ -113,25 +121,21 @@ def load_private_pkcs11_key(key):
 
     null = _ffi.NULL
 
-    # key is supposed to have b"engine:<engine_id>:<key_id>:<PIN>" format.
-    parts = key.decode().split(":")
-    if parts[0] != "engine" or len(parts) !=4:
+    # key_url has b"engine:<engine_id>:<key_id>" format. Split it into 3 parts.
+    parts = key_url.decode().split(":", 2)
+    if parts[0] != "engine" or len(parts) < 3:
         raise exceptions.MutualTLSChannelError("invalid key format")
     engine_id = parts[1]
     key_id = parts[2]
-    pin = parts[3]
 
     _lib.ENGINE_load_builtin_engines()
-    e = _lib.ENGINE_by_id(engine_id)
+    e = _lib.ENGINE_by_id(engine_id.encode())
     if not e:
         raise exceptions.MutualTLSChannelError("failed to load engine: " + engine_id)
-
-    _lib.ENGINE_ctrl_cmd_string(e, b"LOAD", null, 0)
-    _lib.ENGINE_ctrl_cmd_string(e, b"PIN", pin, 0)
     if not _lib.ENGINE_init(e):
         raise exceptions.MutualTLSChannelError("failed to init engine: " + engine_id)
     
-    key = _lib.ENGINE_load_private_key(e, key_id, null, null)
+    key = _lib.ENGINE_load_private_key(e, key_id.encode(), null, null)
     if not key:
         raise exceptions.MutualTLSChannelError("failed to load private key: " + key_id)
 
